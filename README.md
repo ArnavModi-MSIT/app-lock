@@ -1,5 +1,15 @@
 # Simple App Lock
 
+## Download APK
+
+**[Download Simple App Lock for Android](https://github.com/ArnavModi-MSIT/app-lock/releases/download/v1.0.0/Simple-App-Lock-v1.0.apk)**
+
+[Release details](https://github.com/ArnavModi-MSIT/app-lock/releases/tag/v1.0.0)
+· Android 9 or newer · Free and offline
+
+Personal test build. Build checks and eight unit tests pass; testing on the
+Samsung M33 is still pending. Download the APK on your phone and open it to install.
+
 A small offline Android app adapted from OpenLock for casual privacy. Select
 apps and they ask for a fingerprint or a separate 6–12 digit app-lock PIN.
 The current app stays unlocked until you switch away or turn the screen off.
