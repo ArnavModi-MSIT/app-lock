@@ -105,9 +105,11 @@ class MainActivity : FragmentActivity() {
         val root = column()
         root.addView(label("Simple App Lock", 28f))
         val ready = Access.ready(this)
+        val fast = Access.fastEnabled(this)
         val status = when {
-            !ready -> "Setup needed: allow Usage access and Display over other apps below."
-            store.enabled && OpenLockMonitorService.running -> "App lock is on. Selected apps ask for fingerprint or PIN."
+            !ready -> "Setup needed: enable Faster locking below."
+            store.enabled && fast -> "App lock is on · faster window-event detection."
+            store.enabled && OpenLockMonitorService.running -> "App lock is on · slower compatibility mode. Enable Faster locking to reduce the delay."
             store.enabled -> "App lock is enabled. Starting protection…"
             else -> "App lock is off. Choose apps, then turn it on."
         }
@@ -118,14 +120,18 @@ class MainActivity : FragmentActivity() {
             setOnCheckedChangeListener { _, checked ->
                 if (checked && !Access.ready(this@MainActivity)) {
                     isChecked = false
-                    toast("Grant Usage access and Display over other apps first.")
+                    toast("Enable Faster locking, or grant Usage access and Display over other apps.")
                 } else {
                     store.enabled = checked
                     if (checked) startMonitor() else {
                         stopService(Intent(this@MainActivity, OpenLockMonitorService::class.java))
                         LockSession.relock()
+                        FastLockService.clearCover()
                     }
-                    protectionStatus.text = if (checked) "App lock is on. Selected apps ask for fingerprint or PIN." else "App lock is off."
+                    protectionStatus.text = if (checked) {
+                        if (Access.fastEnabled(this@MainActivity)) "App lock is on · faster window-event detection."
+                        else "App lock is on · slower compatibility mode. Enable Faster locking to reduce the delay."
+                    } else "App lock is off."
                 }
             }
         })
@@ -133,10 +139,15 @@ class MainActivity : FragmentActivity() {
             text = "Use fingerprint (PIN remains available)"; isChecked = store.biometric
             setOnCheckedChangeListener { _, checked -> store.biometric = checked }
         })
-        root.addView(button(if (Access.usage(this)) "Usage access · allowed" else "Allow Usage access") {
+        root.addView(button(if (fast) "Faster locking · enabled" else "Enable Faster locking (recommended)") {
+            openSettings(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        })
+        root.addView(label("In Accessibility → Installed apps, enable ‘Simple App Lock — faster locking’. It detects app window changes without reading messages or screen contents.", 14f))
+        root.addView(label("If Android blocks it: App info → ⋮ → Allow restricted settings, then enable the service. Keep the compatibility permissions below only if needed.", 14f))
+        root.addView(button(if (Access.usage(this)) "Compatibility: Usage access · allowed" else "Compatibility: allow Usage access") {
             openSettings(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         })
-        root.addView(button(if (Settings.canDrawOverlays(this)) "Display over apps · allowed" else "Allow Display over other apps") {
+        root.addView(button(if (Settings.canDrawOverlays(this)) "Compatibility: display over apps · allowed" else "Compatibility: display over other apps") {
             openSettings(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
         })
         root.addView(button("Battery settings") {

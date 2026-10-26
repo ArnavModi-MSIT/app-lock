@@ -2,13 +2,15 @@
 
 ## Download APK
 
-**[Download Simple App Lock for Android](https://github.com/ArnavModi-MSIT/app-lock/releases/download/v1.0.0/Simple-App-Lock-v1.0.apk)**
+**[Download Simple App Lock v1.1 for Android](https://github.com/ArnavModi-MSIT/app-lock/releases/download/v1.1.0/Simple-App-Lock-v1.1.apk)**
 
-[Release details](https://github.com/ArnavModi-MSIT/app-lock/releases/tag/v1.0.0)
+[Release details](https://github.com/ArnavModi-MSIT/app-lock/releases/tag/v1.1.0)
 · Android 9 or newer · Free and offline
 
-Personal test build. Build checks and eight unit tests pass; testing on the
-Samsung M33 is still pending. Download the APK on your phone and open it to install.
+Personal test build. v1.0 was reported working on a Samsung M33, but Telegram
+could remain visible for 1–2 seconds before locking. v1.1 adds event-based
+locking and a privacy cover; its timing needs to be checked on the phone.
+Install this APK over v1.0 to keep your PIN and selected apps.
 
 A small offline Android app adapted from OpenLock for casual privacy. Select
 apps and they ask for a fingerprint or a separate 6–12 digit app-lock PIN.
@@ -17,7 +19,10 @@ The current app stays unlocked until you switch away or turn the screen off.
 ## Setup on the phone
 
 1. Install the APK and create/confirm your app-lock PIN.
-2. Grant Usage access and Display over other apps using the buttons.
+2. Tap **Enable Faster locking (recommended)**. Under Accessibility → Installed
+   apps, enable **Simple App Lock — faster locking**. If Android shows a
+   restricted-settings block, follow [Google's instructions](https://support.google.com/android/answer/12623953)
+   to allow restricted settings from this app's App info menu, then return.
 3. Enrol a fingerprint in the phone's Settings if needed. The fingerprint
    toggle is on by default; the app-lock PIN is always available.
 4. Choose your protected apps and turn **App lock on** on.
@@ -30,7 +35,13 @@ home launcher are excluded from selection to avoid locking you out of recovery.
 If you forget the app-lock PIN, clear Simple App Lock's storage or uninstall it,
 then set up again. This removes the selected-app configuration.
 
-The app requests no internet, camera, accessibility or device-admin permission.
+The app requests no internet, camera or device-admin permission. The faster
+mode uses an accessibility service subscribed only to window-state events with
+zero notification batching. Screen-content retrieval is disabled: it uses the
+package/class metadata, not message text, view trees, screenshots or gestures.
+An opaque accessibility overlay covers the app while the unlock screen loads,
+and is removed after that screen's first rendered frame. The cover includes
+retry and Go home buttons if activity startup is delayed.
 It stores a salted PBKDF2 PIN verifier in private preferences, never the PIN.
 Any strong biometric accepted by Android can satisfy the system prompt; on the
 intended Samsung M33 the expected method is the fingerprint sensor. Fingerprint
@@ -38,9 +49,14 @@ templates are handled by Android, not this app.
 
 ## Limits
 
-App detection uses UsageStats, polling at 150 ms while the display is awake and
-unlocked. That is a polling interval, not a guaranteed response time: a selected
-app may briefly appear before the lock screen. Notifications and protected apps'
+Faster mode reacts to accessibility window-change events without UsageStats
+polling. If faster mode is not enabled, the original Usage access + Display over
+other apps permissions still provide a slower compatibility mode (150 ms polling,
+with potentially larger Android reporting delays). Delayed usage events are not
+replayed while the accessibility service is connected.
+
+Even faster mode reacts after Android reports a window change, so a zero-frame
+content leak cannot be guaranteed. Notifications and protected apps'
 own recent-app thumbnails are not hidden. Force-stop, permission removal,
 uninstall and safe mode bypass protection. Split screen/PiP are not guaranteed.
 This app does not encrypt other apps or replace Secure Folder.
@@ -63,6 +79,10 @@ local testing. Keep its signing key if you want later builds to update in place.
 ## Phone acceptance checks (must be performed on the actual phone)
 
 - Open a selected app; expect fingerprint/PIN. Cancel or press Back: go home.
+- With Faster locking enabled, check Telegram from its launcher icon, Recents,
+  and a notification. Check both a cold start and an already-running app.
+- The privacy cover should hand off to fingerprint/PIN without briefly
+  revealing Telegram or getting stuck over the PIN keypad.
 - Correct fingerprint/PIN reveals the app. Wrong PIN leaves it locked.
 - Stay in the same app, including opening its keyboard: no repeat prompt.
 - Switch to Home/another app and return: expect authentication again.

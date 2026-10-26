@@ -9,7 +9,7 @@ import android.os.*
 import android.provider.Settings
 import android.util.Log
 
-/** Simplified from OpenLock's foreground usage monitor. No accessibility access. */
+/** Persistent notification and optional usage-access fallback for event-based locking. */
 class OpenLockMonitorService : Service() {
     private lateinit var store: ConfigStore
     private lateinit var usage: UsageStatsManager
@@ -65,6 +65,12 @@ class OpenLockMonitorService : Service() {
     }
     private fun tick() {
         if (!Access.ready(this)) { stopSelf(); return }
+        // Never replay delayed UsageStats transitions over the accessibility event stream.
+        if (FastLockService.connected) {
+            foreground = null; lastQuery = 0L; lastTarget = null
+            return
+        }
+        if (!Access.usage(this) || !Settings.canDrawOverlays(this)) return
         val now = System.currentTimeMillis()
         // Retain the last app between events; an app can stay open for hours.
         val events = usage.queryEvents(if (lastQuery == 0L) now - 60_000 else lastQuery - 1, now)
@@ -89,7 +95,7 @@ class OpenLockMonitorService : Service() {
         lastTarget = pkg
         lastLaunch = SystemClock.elapsedRealtime()
         startActivity(Intent(this, LockActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NO_ANIMATION)
             putExtra(LockActivity.EXTRA_PACKAGE, pkg)
         })
     }

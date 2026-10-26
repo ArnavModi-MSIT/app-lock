@@ -75,6 +75,21 @@ class LockActivity : FragmentActivity() {
         root.addView(button("Go home") { goHome() })
         val scroll = ScrollView(this).apply { isFillViewport = true; addView(root) }
         setContentView(scroll); fitInsets(root); updateDots()
+        // Keep the opaque accessibility cover until our first frame is actually drawn.
+        val drawingTarget = target
+        if (Build.VERSION.SDK_INT >= 29) {
+            root.viewTreeObserver.registerFrameCommitCallback {
+                runOnUiThread { FastLockService.dismissCoverFor(drawingTarget) }
+            }
+        } else {
+            root.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
+                override fun onPreDraw(): Boolean {
+                    root.viewTreeObserver.removeOnPreDrawListener(this)
+                    root.postOnAnimation { FastLockService.dismissCoverFor(drawingTarget) }
+                    return true
+                }
+            })
+        }
         if (!store.hasPin()) message.text = "PIN setup is missing. Open Simple App Lock to set it up."
     }
     override fun onPostResume() {
@@ -129,12 +144,14 @@ class LockActivity : FragmentActivity() {
     private fun unlock() {
         if (authenticated) return
         authenticated = true
+        FastLockService.dismissCoverFor(target)
         store.resetAttempts()
         if (settingsGate) setResult(Activity.RESULT_OK) else LockSession.markUnlocked(target)
         finish()
     }
     private fun goHome() {
         startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        FastLockService.dismissCoverFor(target)
         finish()
     }
     override fun onStop() {
