@@ -2,15 +2,27 @@
 
 ## Download APK
 
-**[Download Simple App Lock v1.1 for Android](https://github.com/ArnavModi-MSIT/app-lock/releases/download/v1.1.0/Simple-App-Lock-v1.1.apk)**
+**[Download Simple App Lock v1.2 for Android](https://github.com/ArnavModi-MSIT/app-lock/releases/download/v1.2.0/Simple-App-Lock-v1.2.apk)**
 
-[Release details](https://github.com/ArnavModi-MSIT/app-lock/releases/tag/v1.1.0)
-· Android 9 or newer · Free and offline
+[Release details](https://github.com/ArnavModi-MSIT/app-lock/releases/tag/v1.2.0)
+· Android 9 or newer · Free · App locking works offline
 
 Personal test build. v1.0 was reported working on a Samsung M33, but Telegram
 could remain visible for 1–2 seconds before locking. v1.1 adds event-based
 locking and a privacy cover; its timing needs to be checked on the phone.
-Install this APK over v1.0 to keep your PIN and selected apps.
+Install this APK over v1.0/v1.1 to keep your PIN and selected apps.
+
+## In-app updates
+
+Install v1.2 manually once. After that, open Simple App Lock and tap **Check for
+updates**. The app checks this repository's releases only when pressed, offers
+the newer version, downloads it, then opens Android's installer. The first time,
+Android asks you to allow Simple App Lock to install apps. Every installation
+still requires your confirmation. There is no background update polling.
+
+Downloads are checked against GitHub's SHA-256 digest, the package ID, a higher
+versionCode and the installed app's signing certificate. Test/prerelease builds
+from this personal repository are included. No GitHub login is needed.
 
 A small offline Android app adapted from OpenLock for casual privacy. Select
 apps and they ask for a fingerprint or a separate 6–12 digit app-lock PIN.
@@ -35,7 +47,9 @@ home launcher are excluded from selection to avoid locking you out of recovery.
 If you forget the app-lock PIN, clear Simple App Lock's storage or uninstall it,
 then set up again. This removes the selected-app configuration.
 
-The app requests no internet, camera or device-admin permission. The faster
+The app requests internet access only for checking/downloading updates and
+install-package permission to open Android's update confirmation. No camera or
+device-admin permission. The faster
 mode uses an accessibility service subscribed only to window-state events with
 zero notification batching. Screen-content retrieval is disabled: it uses the
 package/class metadata, not message text, view trees, screenshots or gestures.
@@ -76,6 +90,20 @@ Set `sdk.dir` in local.properties or ANDROID_HOME, then:
 APK: app/build/outputs/apk/debug/app-debug.apk. The debug build is suitable for
 local testing. Keep its signing key if you want later builds to update in place.
 
+## GitHub Actions
+
+The Android workflow checks main-branch pushes and pull requests. Version tags
+(`v1.2.0`) or a manual run with **publish** enabled build an APK using the existing
+signing identity and publish it to Releases after checks pass. Increase both
+versionName and versionCode before publishing another update. Already-published
+versions are not overwritten.
+
+The signing keystore is supplied through the encrypted repository secret
+`APPLOCK_KEYSTORE_BASE64`. It must match the key used by the installed app.
+Never commit it or replace it with a newly generated key for an update. Pull
+request checks do not receive the signing key. Release jobs verify the expected
+certificate fingerprint before uploading.
+
 ## Phone acceptance checks (must be performed on the actual phone)
 
 - Open a selected app; expect fingerprint/PIN. Cancel or press Back: go home.
@@ -93,6 +121,10 @@ local testing. Keep its signing key if you want later builds to update in place.
   Lock if Samsung prevented automatic startup.
 - Leave it idle for several minutes, then check a selected app again.
 - Turn app lock off: selected apps open normally.
+- Tap Check for updates while offline: a failure message should appear without
+  affecting app locking. When a newer version is published, download it, allow
+  installation if asked, and confirm Android's installer. Verify PIN, app list
+  and accessibility status after the update.
 
 Unit tests cover PIN verification and session transitions. A successful build
 does not establish Samsung/Android 16 runtime compatibility.

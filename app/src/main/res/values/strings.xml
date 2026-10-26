@@ -1,4 +1,4 @@
 <resources>
     <string name="fast_lock_name">Simple App Lock — faster locking</string>
-    <string name="fast_lock_description">Detects which app window opens and covers selected apps while fingerprint or PIN verification starts. Uses package and window-change events only. Does not retrieve screen contents, read messages, type, perform gestures, or use the internet. Enable this for faster locking.</string>
+    <string name="fast_lock_description">Detects which app window opens and covers selected apps while fingerprint or PIN verification starts. Uses package and window-change events only. Does not retrieve screen contents, read messages, type, or perform gestures. App data is not uploaded. Enable this for faster locking.</string>
 </resources>

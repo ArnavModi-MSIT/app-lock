@@ -24,11 +24,14 @@ class MainActivity : FragmentActivity() {
     private var gatePending = false
     private var apps: List<AppRow> = emptyList()
     private var renderVersion = 0
+    private lateinit var updater: UpdateController
+    private var updateStatus: TextView? = null
     private data class AppRow(val pkg: String, val name: String, val icon: Drawable)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = ConfigStore(this)
+        updater = UpdateController(this, { authorized }) { updateStatus?.text = it }
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     }
     override fun onResume() {
@@ -43,7 +46,7 @@ class MainActivity : FragmentActivity() {
                     .putExtra(LockActivity.EXTRA_PACKAGE, packageName)
                     .putExtra(LockActivity.EXTRA_SETTINGS, true), AUTH)
             }
-        } else showApps()
+        } else { showApps(); updater.onAuthorizedResume() }
     }
     @Deprecated("Deprecated in Java")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -57,6 +60,7 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         authorized = false
+        updater.onStop()
         renderVersion++
         if (store.hasPin()) setContentView(label("Settings locked", 24f))
     }
@@ -96,7 +100,7 @@ class MainActivity : FragmentActivity() {
             }
         }
         root.addView(save)
-        root.addView(label("No account, ads, internet access or camera. If you forget this PIN, clear this app’s storage and set it up again."))
+        root.addView(label("No account, ads or camera. Internet is used only when you check/download updates. If you forget this PIN, clear this app’s storage and set it up again."))
         setContentView(ScrollView(this).apply { isFillViewport = true; addView(root) }); fitInsets(root)
     }
     private fun showApps() {
@@ -158,6 +162,10 @@ class MainActivity : FragmentActivity() {
             root.addView(button("Allow protection notification") { requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101) })
         }
         root.addView(button("Change app-lock PIN") { changePin() })
+        val installedVersion = packageManager.getPackageInfo(packageName, 0).versionName
+        root.addView(button("Check for updates · v$installedVersion") { updater.check() })
+        updateStatus = label(updater.status, 14f)
+        root.addView(updateStatus)
         root.addView(label("Protected apps", 24f))
         root.addView(label("Apps relock after you switch away or turn the screen off. App detection can have a short delay.", 14f))
         val search = EditText(this).apply { hint = "Search apps"; inputType = InputType.TYPE_CLASS_TEXT }
@@ -239,6 +247,6 @@ class MainActivity : FragmentActivity() {
         dialog.show()
     }
     private fun toast(text: String) { Toast.makeText(this, text, Toast.LENGTH_LONG).show() }
-    override fun onDestroy() { worker.shutdown(); super.onDestroy() }
+    override fun onDestroy() { updater.close(); worker.shutdown(); super.onDestroy() }
     companion object { private const val AUTH = 100 }
 }
