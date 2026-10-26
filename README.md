@@ -2,15 +2,18 @@
 
 ## Download APK
 
-**[Download Simple App Lock v1.2 for Android](https://github.com/ArnavModi-MSIT/app-lock/releases/download/v1.2.0/Simple-App-Lock-v1.2.apk)**
+**[Download Simple App Lock v1.3 for Android](https://github.com/ArnavModi-MSIT/app-lock/releases/download/v1.3.0/Simple-App-Lock-v1.3.apk)**
 
-[Release details](https://github.com/ArnavModi-MSIT/app-lock/releases/tag/v1.2.0)
+[Release details](https://github.com/ArnavModi-MSIT/app-lock/releases/tag/v1.3.0)
 · Android 9 or newer · Free · App locking works offline
 
 Personal test build. v1.0 was reported working on a Samsung M33, but Telegram
 could remain visible for 1–2 seconds before locking. v1.1 adds event-based
 locking and a privacy cover; its timing needs to be checked on the phone.
-Install this APK over v1.0/v1.1 to keep your PIN and selected apps.
+v1.3 prepares the cover in advance and waits for its first frame before starting
+the authentication activity. This avoids putting the activity-start call ahead
+of cover rendering. Actual speed on the phone remains unmeasured.
+Install this APK over your existing version to keep your PIN and selected apps.
 
 ## In-app updates
 

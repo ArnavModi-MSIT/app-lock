@@ -6,6 +6,8 @@ import android.content.*
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
@@ -22,6 +24,9 @@ class FastLockService : AccessibilityService() {
     private lateinit var store: ConfigStore
     private lateinit var windows: WindowManager
     private var cover: View? = null
+    private var preparedCover: View? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var coverGeneration = 0L
     private var coveredTarget: String? = null
     private var keyboard: String? = null
     private var lastApp: String? = null
@@ -39,6 +44,8 @@ class FastLockService : AccessibilityService() {
         super.onServiceConnected()
         store = ConfigStore(this)
         windows = getSystemService(WindowManager::class.java)
+        // Build widgets while the service connects, not while a protected app opens.
+        preparedCover = createCover()
         keyboard = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/')
         instance = this
         LockSession.relock()
@@ -71,8 +78,8 @@ class FastLockService : AccessibilityService() {
         if (LockActivity.visibleTarget == pkg) return
         if (pendingTarget == pkg && SystemClock.elapsedRealtime() - lastLaunch < 700) return
         pendingTarget = pkg
+        lastLaunch = SystemClock.elapsedRealtime()
         showCover(pkg)
-        launchPrompt(pkg)
     }
     private fun launchPrompt(pkg: String) {
         lastLaunch = SystemClock.elapsedRealtime()
@@ -83,11 +90,7 @@ class FastLockService : AccessibilityService() {
             })
         }.onFailure { Log.w("SimpleAppLock", "Tap cover to open verification", it) }
     }
-    private fun showCover(pkg: String) {
-        if (coveredTarget == pkg && cover != null) return
-        hideCover()
-        coveredTarget = pkg
-        val root = LinearLayout(this).apply {
+    private fun createCover(): View = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             setBackgroundColor(Color.rgb(10, 12, 16))
@@ -104,25 +107,63 @@ class FastLockService : AccessibilityService() {
                 setOnClickListener { performGlobalAction(GLOBAL_ACTION_HOME); hideCover(); pendingTarget = null }
             })
         }
+    private fun showCover(pkg: String) {
+        if (coveredTarget == pkg && cover != null) { launchPrompt(pkg); return }
+        hideCover()
+        coveredTarget = pkg
+        val root = preparedCover ?: createCover().also { preparedCover = it }
+        val generation = coverGeneration
+        val requestedAt = SystemClock.uptimeMillis()
+        var launched = false
+        fun afterDraw() {
+            if (launched || generation != coverGeneration || coveredTarget != pkg) return
+            launched = true
+            Log.d("AppLockTiming", "Cover handoff: ${SystemClock.uptimeMillis() - requestedAt} ms")
+            launchPrompt(pkg)
+        }
+        // addView schedules drawing; immediately calling startActivity here can
+        // block that traversal on its synchronous system call. Wait for the
+        // cover's first frame before starting the authentication activity.
+        val beforeDraw = object : android.view.ViewTreeObserver.OnPreDrawListener {
+            override fun onPreDraw(): Boolean {
+                root.viewTreeObserver.removeOnPreDrawListener(this)
+                if (Build.VERSION.SDK_INT >= 29 && root.isHardwareAccelerated) {
+                    root.viewTreeObserver.registerFrameCommitCallback { handler.post { afterDraw() } }
+                } else root.post { afterDraw() }
+                return true
+            }
+        }
+        root.viewTreeObserver.addOnPreDrawListener(beforeDraw)
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_SECURE or WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.OPAQUE
         ).apply {
             gravity = Gravity.TOP or Gravity.START
             if (Build.VERSION.SDK_INT >= 28) layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
-        runCatching { windows.addView(root, params); cover = root }
-            .onFailure { coveredTarget = null; Log.w("SimpleAppLock", "Could not show privacy cover", it) }
+        runCatching {
+            windows.addView(root, params); cover = root
+            // A bounded fallback for devices that omit the frame callback.
+            handler.postDelayed({ afterDraw() }, 300)
+        }.onFailure {
+            root.viewTreeObserver.removeOnPreDrawListener(beforeDraw)
+            coveredTarget = null
+            Log.w("SimpleAppLock", "Could not show privacy cover", it)
+            launchPrompt(pkg)
+        }
     }
     private fun hideCover() {
+        coverGeneration++
         cover?.let { runCatching { windows.removeViewImmediate(it) } }
         cover = null; coveredTarget = null
     }
     override fun onInterrupt() { hideCover() }
     override fun onDestroy() {
         hideCover()
+        handler.removeCallbacksAndMessages(null)
+        preparedCover = null
         if (instance === this) instance = null
         if (::store.isInitialized) runCatching { unregisterReceiver(screenOff) }
         super.onDestroy()
